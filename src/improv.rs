@@ -211,6 +211,7 @@ async fn request_device_information() {
     drop(hash_device);
 
     let device_name_parts = digest.into_iter()
+        .take(8)
         .map(|b| format!("{:02x}", b))
         .collect::<alloc::vec::Vec<_>>();
     let device_name = device_name_parts.join(":");

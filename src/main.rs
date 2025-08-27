@@ -327,6 +327,7 @@ async fn vas() {
                     .await;
 
                 target.deselect().await?;
+                debug!("Deselected target");
 
                 res
             }
@@ -334,10 +335,14 @@ async fn vas() {
             {
                 Ok(res) => {
                     if let Some(res) = res {
-
+                        if handle_response(res).await {
+                            status_sender.send(VASStatus::Done);
+                        } else {
+                            status_sender.send(VASStatus::Error);
+                        }
+                    } else {
+                        status_sender.send(VASStatus::Error);
                     }
-
-                    status_sender.send(VASStatus::Done);
                 }
                 Err(e) => {
                     warn!("{:?}", e);
@@ -345,6 +350,24 @@ async fn vas() {
                 }
             }
             embassy_time::Timer::after_secs(3).await;
+        }
+    }
+}
+
+async fn handle_response(res: vas::ResultData) -> bool {
+    match res {
+        vas::ResultData::Apple(()) => true,
+        vas::ResultData::Google(res) => {
+            let data = if res.is_encrypted() {
+                match res.decrypt_data().await {
+                    Some(d) => alloc::borrow::Cow::Owned(d),
+                    None => return false,
+                }
+            } else {
+                alloc::borrow::Cow::Borrowed(res.raw_data())
+            };
+            debug!("Google data: {:02X?}", data);
+            true
         }
     }
 }
@@ -411,7 +434,7 @@ async fn lights() {
                             let mul = 2usize.pow(j as u32);
                             let j = NUM_LEDS - j;
                             leds[(x + j) % NUM_LEDS] =
-                                ws2812::Color::new(0, 0, (255usize / mul) as u8);
+                                ws2812::Color::new(0, (255usize / mul) as u8, 0);
                         }
                         x = (x + 1) % NUM_LEDS;
                     }
@@ -430,7 +453,7 @@ async fn lights() {
                             let mul = 2usize.pow(j as u32);
                             let j = NUM_LEDS - j;
                             leds[(x + j) % NUM_LEDS] =
-                                ws2812::Color::new(0, (255usize / mul) as u8, 0);
+                                ws2812::Color::new(0, 0, (255usize / mul) as u8);
                         }
                         x = (x + 1) % NUM_LEDS;
                     }
