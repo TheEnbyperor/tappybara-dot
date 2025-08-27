@@ -1,0 +1,26 @@
+TappybaraConfig DEFINITIONS AUTOMATIC TAGS ::= BEGIN
+
+    Identity ::= SEQUENCE {
+        privateKey OCTET STRING (SIZE(32))
+    }
+
+    ConnectionConfig ::= SEQUENCE {
+        networks SEQUENCE OF WifiNetwork,
+        serverPublicKeyIdentity OCTET STRING (SIZE(32)),
+        ...
+    }
+
+    WifiNetwork ::= SEQUENCE {
+        ssid UTF8String,
+        password UTF8String OPTIONAL,
+        authMethod WifiAuthMethod,
+    }
+
+    WifiAuthMethod ::= ENUMERATED {
+        WPA2Personal,
+        WPA3Personal,
+        WPA2WPA3Personal,
+        ...
+    }
+
+END

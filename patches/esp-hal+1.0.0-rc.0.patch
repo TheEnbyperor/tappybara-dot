@@ -1,0 +1,126 @@
+diff --git a/src/i2c/master/mod.rs b/src/i2c/master/mod.rs
+index 8e538e1..23d0fb4 100644
+--- a/src/i2c/master/mod.rs
++++ b/src/i2c/master/mod.rs
+@@ -1096,6 +1096,18 @@ impl<'d> I2c<'d, Async> {
+             .await
+             .inspect_err(|_| self.internal_recover())
+     }
++
++    #[allow(missing_docs)]
++    pub async fn transaction_async_cb<'a, A: Into<I2cAddress>, R, E: From<Error>>(
++        &mut self,
++        address: A,
++        cb: impl AsyncFnOnce(Transaction<'_>) -> Result<R, E>,
++    ) -> Result<R, E> {
++        self.driver()
++            .transaction_impl_async_cb(address.into(), cb)
++            .await
++            .inspect_err(|_| self.internal_recover())
++    }
+ }
+ 
+ impl<'d, Dm> I2c<'d, Dm>
+@@ -2827,6 +2839,73 @@ impl Driver<'_> {
+ 
+         Ok(())
+     }
++
++    async fn transaction_impl_async_cb<'a, R, E: From<Error>>(
++        &'a self,
++        address: I2cAddress,
++        cb: impl AsyncFnOnce(Transaction<'a>) -> Result<R, E>,
++    ) -> Result<R, E> {
++        address.validate()?;
++        self.ensure_idle().await;
++
++        let mut deadline = Deadline::None;
++
++        if let SoftwareTimeout::Transaction(timeout) = self.config.config.software_timeout {
++            deadline = Deadline::Fixed(Instant::now() + timeout);
++        }
++
++        cb(Transaction {
++            driver: &self,
++            address,
++            deadline,
++        }).await
++    }
++}
++
++#[allow(missing_docs)]
++pub struct Transaction<'a> {
++    driver: &'a Driver<'a>,
++    address: I2cAddress,
++    deadline: Deadline,
++}
++
++impl Transaction<'_> {
++    #[allow(missing_docs)]
++    pub async fn write(&self, buffer: &[u8], start: bool, stop: bool) -> Result<(), Error> {
++        let mut deadline = self.deadline;
++
++        if let SoftwareTimeout::PerByte(timeout) = self.driver.config.config.software_timeout {
++            deadline = Deadline::PerByte(timeout);
++        }
++        self.driver.write(
++            self.address,
++            buffer,
++            start,
++            stop,
++            deadline,
++        ).await?;
++
++        Ok(())
++    }
++
++    #[allow(missing_docs)]
++    pub async fn read(&self, buffer: &mut [u8], start: bool, stop: bool, will_continue: bool) -> Result<(), Error> {
++        let mut deadline = self.deadline;
++
++        if let SoftwareTimeout::PerByte(timeout) = self.driver.config.config.software_timeout {
++            deadline = Deadline::PerByte(timeout);
++        }
++        self.driver.read(
++            self.address,
++            buffer,
++            start,
++            stop,
++            will_continue,
++            deadline,
++        ).await?;
++
++        Ok(())
++    }
+ }
+ 
+ /// Chunks a slice by I2C_CHUNK_SIZE in a way to avoid the last chunk being
+diff --git a/src/system.rs b/src/system.rs
+index 60750ce..a57cafd 100755
+--- a/src/system.rs
++++ b/src/system.rs
+@@ -270,10 +270,12 @@ impl Drop for PeripheralGuard {
+ 
+ #[derive(Debug)]
+ #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+-pub(crate) struct GenericPeripheralGuard<const P: u8> {}
++#[allow(missing_docs)]
++pub struct GenericPeripheralGuard<const P: u8> {}
+ 
+ impl<const P: u8> GenericPeripheralGuard<P> {
+-    pub(crate) fn new_with(init: fn(CriticalSection<'_>)) -> Self {
++    #[allow(missing_docs)]
++    pub fn new_with(init: fn(CriticalSection<'_>)) -> Self {
+         let peripheral = unwrap!(Peripheral::try_from(P));
+         critical_section::with(|cs| {
+             if !Peripheral::KEEP_ENABLED.contains(&peripheral)
+@@ -287,7 +289,8 @@ impl<const P: u8> GenericPeripheralGuard<P> {
+         Self {}
+     }
+ 
+-    pub(crate) fn new() -> Self {
++    #[allow(missing_docs)]
++    pub fn new() -> Self {
+         Self::new_with(|_| {})
+     }
+ }

@@ -1,0 +1,121 @@
+src/libwolfssl_la-dtls13.lo: src/dtls13.c .build_params \
+ wolfssl/wolfcrypt/libwolfssl_sources.h config.h \
+ wolfssl/wolfcrypt/types.h wolfssl/wolfcrypt/settings.h \
+ /Users/q/Documents/2log-dot-vas/wolfssl-5.8.2/../user_settings.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/string.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/_ansi.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/newlib.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/_newlib_version.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/config.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/machine/ieeefp.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/features.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/reent.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/_ansi.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include/stddef.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/_types.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/machine/_types.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/machine/_default_types.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/lock.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/assert.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/cdefs.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/_locale.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/strings.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/string.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/stdio.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include/stdarg.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/stdio.h \
+ wolfssl/wolfcrypt/visibility.h wolfssl/wolfcrypt/wc_port.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include/stdatomic.h \
+ wolfssl/wolfcrypt/oid_sum.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include/limits.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include/syslimits.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/limits.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/syslimits.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include/stdint.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/stdint.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/_intsup.h \
+ /Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/_stdint.h \
+ wolfssl/wolfcrypt/memory.h wolfssl/wolfcrypt/error-crypt.h \
+ wolfssl/wolfcrypt/logging.h wolfssl/error-ssl.h wolfssl/internal.h \
+ wolfssl/ssl.h wolfssl/version.h wolfssl/wolfcrypt/asn_public.h \
+ wolfssl/wolfcrypt/random.h wolfssl/wolfcrypt/sha256.h \
+ wolfssl/wolfcrypt/pkcs12.h wolfssl/wolfcrypt/cryptocb.h \
+ wolfssl/wolfcrypt/ecc.h wolfssl/wolfcrypt/wolfmath.h \
+ wolfssl/wolfcrypt/sp_int.h wolfssl/wolfcrypt/hash.h \
+ wolfssl/wolfcrypt/sha.h wolfssl/wolfcrypt/sha512.h \
+ wolfssl/wolfcrypt/aes.h wolfssl/wolfcrypt/hmac.h wolfssl/callbacks.h \
+ wolfssl/wolfio.h wolfssl/wolfcrypt/chacha.h wolfssl/wolfcrypt/asn.h \
+ wolfssl/wolfcrypt/dh.h wolfssl/wolfcrypt/poly1305.h \
+ wolfssl/wolfcrypt/kdf.h wolfssl/wolfcrypt/wc_encrypt.h \
+ wolfssl/wolfcrypt/hpke.h wolfcrypt/src/misc.c wolfssl/wolfcrypt/misc.h
+.build_params:
+wolfssl/wolfcrypt/libwolfssl_sources.h:
+config.h:
+wolfssl/wolfcrypt/types.h:
+wolfssl/wolfcrypt/settings.h:
+/Users/q/Documents/2log-dot-vas/wolfssl-5.8.2/../user_settings.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/string.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/_ansi.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/newlib.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/_newlib_version.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/config.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/machine/ieeefp.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/features.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/reent.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/_ansi.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include/stddef.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/_types.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/machine/_types.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/machine/_default_types.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/lock.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/assert.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/cdefs.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/_locale.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/strings.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/string.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/stdio.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include/stdarg.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/stdio.h:
+wolfssl/wolfcrypt/visibility.h:
+wolfssl/wolfcrypt/wc_port.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include/stdatomic.h:
+wolfssl/wolfcrypt/oid_sum.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include/limits.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include/syslimits.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/limits.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/syslimits.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include/stdint.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/stdint.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/_intsup.h:
+/Users/q/.rustup/toolchains/esp/xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf/include/sys/_stdint.h:
+wolfssl/wolfcrypt/memory.h:
+wolfssl/wolfcrypt/error-crypt.h:
+wolfssl/wolfcrypt/logging.h:
+wolfssl/error-ssl.h:
+wolfssl/internal.h:
+wolfssl/ssl.h:
+wolfssl/version.h:
+wolfssl/wolfcrypt/asn_public.h:
+wolfssl/wolfcrypt/random.h:
+wolfssl/wolfcrypt/sha256.h:
+wolfssl/wolfcrypt/pkcs12.h:
+wolfssl/wolfcrypt/cryptocb.h:
+wolfssl/wolfcrypt/ecc.h:
+wolfssl/wolfcrypt/wolfmath.h:
+wolfssl/wolfcrypt/sp_int.h:
+wolfssl/wolfcrypt/hash.h:
+wolfssl/wolfcrypt/sha.h:
+wolfssl/wolfcrypt/sha512.h:
+wolfssl/wolfcrypt/aes.h:
+wolfssl/wolfcrypt/hmac.h:
+wolfssl/callbacks.h:
+wolfssl/wolfio.h:
+wolfssl/wolfcrypt/chacha.h:
+wolfssl/wolfcrypt/asn.h:
+wolfssl/wolfcrypt/dh.h:
+wolfssl/wolfcrypt/poly1305.h:
+wolfssl/wolfcrypt/kdf.h:
+wolfssl/wolfcrypt/wc_encrypt.h:
+wolfssl/wolfcrypt/hpke.h:
+wolfcrypt/src/misc.c:
+wolfssl/wolfcrypt/misc.h:

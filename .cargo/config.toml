@@ -1,0 +1,17 @@
+[target.xtensa-esp32-none-elf]
+runner = "espflash flash --monitor --partition-table partitions.csv"
+
+[env]
+CFLAGS_xtensa-esp32-none-elf="-mlongcalls -Ofast"
+CC_xtensa-esp32-none-elf="xtensa-esp32-elf-gcc"
+AR_xtensa-esp32-none-elf="xtensa-esp32-elf-ar"
+
+[build]
+rustflags = [
+    "-C", "link-arg=-nostartfiles",
+]
+
+target = "xtensa-esp32-none-elf"
+
+[unstable]
+build-std = ["alloc", "core"]

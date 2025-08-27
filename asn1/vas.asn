@@ -1,0 +1,152 @@
+Tappybara DEFINITIONS AUTOMATIC TAGS ::= BEGIN
+
+	ReaderConfig ::= SEQUENCE {
+		appleVASConfig 			AppleVASConfig OPTIONAL,
+		googleSmartTapConfig	GoogleSmartTapConfig OPTIONAL,
+		pretixConfig 			PretixConfig OPTIONAL,
+		...
+	}
+
+	AppleVASConfig ::= SEQUENCE {
+		passes SEQUENCE OF ApplePass,
+		...
+	}
+
+	ApplePass ::= SEQUENCE {
+		passId 		IA5String,
+		privateKeys	SEQUENCE OF OCTET STRING (32) OPTIONAL,
+		...
+	}
+
+	GoogleSmartTapConfig ::= SEQUENCE {
+		collectorId			INTEGER (0..4294967295),
+		collectorKeyVersion	INTEGER (0..4294967295),
+		collectorPrivateKey	OCTET STRING (32),
+		services			SEQUENCE OF INTEGER (0..255) (0..MAX),
+		storeLocationId		INTEGER (0..MAX) OPTIONAL,
+		merchantName		UTF8String OPTIONAL,
+		mcc					INTEGER (0..9999) OPTIONAL,
+		...
+	}
+
+	PretixConfig ::= SEQUENCE {
+		keySets SEQUENCE OF PretixKeySet (1..MAX),
+		...
+	}
+
+	PretixKeySet ::= SEQUENCE {
+		publicId			INTEGER (0..4294967295),
+		uidKey				OCTET STRING (16),
+		diversificationKey	OCTET STRING (16)
+	}
+
+	TapData ::= SEQUENCE {
+		redemption CHOICE {
+			appleVas		AppleVASData,
+			googleSmartTap	GoogleSmartTapData,
+			pretix			PretixData,
+			uid				UIDData,
+			...
+		}
+	}
+
+	AppleVASData ::= SEQUENCE {
+		passId IA5String,
+		data CHOICE {
+			encrypted AppleVASEncryptedData,
+			decrypted AppleVASDecryptedData,
+			...
+		}
+	}
+
+	AppleVASEncryptedData ::= SEQUENCE {
+		keyId			OCTET STRING (4),
+		devicePublicKey	OCTET STRING (33),
+		encryptedData	OCTET STRING
+	}
+
+	AppleVASDecryptedData ::= SEQUENCE {
+		timestamp	INTEGER (0..MAX),
+		payload		OCTET STRING
+	}
+
+	GoogleSmartTapData ::= SEQUENCE {
+		serviceValues SEQUENCE OF GoogleSmartTapServiceValue,
+		...
+	}
+
+	GoogleSmartTapServiceValue ::= SEQUENCE {
+		issuer GoogleSmartTapServiceIssuer,
+		records SEQUENCE OF CHOICE {
+			customer			GoogleSmartTapCustomerRecord,
+			loyalty				GoogleSmartTapLoyaltyRecord,
+			offer				GoogleSmartTapBasePassRecord,
+			giftCard			GoogleSmartTapGiftCardRecord,
+			privateLabelCard	GoogleSmartTapPrivateLabelCardRecord,
+			eventTicket			GoogleSmartTapBasePassRecord,
+			flight				GoogleSmartTapBasePassRecord,
+			transit				GoogleSmartTapBasePassRecord,
+			generic				GoogleSmartTapBasePassRecord,
+			genericPrivatePass	GoogleSmartTapBasePassRecord,
+			...
+		}
+	}
+
+	GoogleSmartTapServiceIssuer ::= SEQUENCE {
+		issuerType ENUMERATED {
+			unknown,
+			merchant,
+			wallet,
+			manufacturer
+		},
+		issuerId INTEGER (0..MAX)
+	}
+
+	GoogleSmartTapCustomerRecord ::= SEQUENCE {
+		customerId			OCTET STRING,
+		preferredLanguage	UTF8String OPTIONAL,
+		uniqueTapId			OCTET STRING OPTIONAL,
+		uniqueDeviceId		OCTET STRING OPTIONAL
+	}
+
+	GoogleSmartTapLoyaltyRecord ::= SEQUENCE {
+		objectId		OCTET STRING,
+		redemptionData	OCTET STRING,
+		track1			OCTET STRING OPTIONAL,
+		track2			OCTET STRING OPTIONAL
+	}
+
+	GoogleSmartTapGiftCardRecord ::= SEQUENCE {
+		objectId		OCTET STRING,
+		redemptionData	OCTET STRING,
+		pin				OCTET STRING OPTIONAL,
+		track1			OCTET STRING OPTIONAL,
+		track2			OCTET STRING OPTIONAL
+	}
+
+	GoogleSmartTapPrivateLabelCardRecord ::= SEQUENCE {
+		objectId		OCTET STRING,
+		redemptionData	OCTET STRING,
+		expiration		OCTET STRING OPTIONAL,
+		cvc1			OCTET STRING OPTIONAL,
+		track1			OCTET STRING OPTIONAL,
+		track2			OCTET STRING OPTIONAL
+	}
+
+	GoogleSmartTapBasePassRecord ::= SEQUENCE {
+		objectId		OCTET STRING,
+		redemptionData	OCTET STRING
+	}
+
+	PretixData ::= SEQUENCE {
+		publicId	INTEGER (0..4294967295),
+		uid			OCTET STRING (7),
+		...
+	}
+
+	UIDData ::= SEQUENCE {
+		uid OCTET STRING (4..11),
+		...
+	}
+
+END

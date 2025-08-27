@@ -1,0 +1,7 @@
+wolfssl (5.8.2) stable; urgency=medium
+
+  * For a full changelog see
+    https://github.com/wolfSSL/wolfssl/blob/master/ChangeLog.md
+
+ -- wolfSSL <support@wolfssl.com>  Wed, 20 Aug 2025 23:40:17 +0200
+

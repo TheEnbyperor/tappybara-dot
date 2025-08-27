@@ -1,0 +1,11 @@
+prefix=/Users/q/Documents/2log-dot-vas/wolfssl-5.8.2/../wolfssl-xtensa
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: wolfssl
+Description: wolfssl C library.
+Version: 5.8.2
+Libs: -L${libdir} -lwolfssl
+Libs.private: 
+Cflags: -I${includedir}
