@@ -92,7 +92,7 @@ impl PrivateKey {
     pub fn shared_secret(&self, peer_key: &PublicKey) -> [u8; 32] {
         let mut shared_secret = [0u8; 32];
         unsafe {
-            sys::uECC_shared_secret(self.private_key.as_ptr(), peer_key.public_key.as_ptr(), shared_secret.as_mut_ptr(), sys::uECC_secp256r1());
+            sys::uECC_shared_secret(peer_key.public_key.as_ptr(), self.private_key.as_ptr(), shared_secret.as_mut_ptr(), sys::uECC_secp256r1());
         }
         shared_secret
     }

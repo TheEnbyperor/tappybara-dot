@@ -200,22 +200,35 @@ impl<'a, T: super::Target> Client<'a, T> {
 }
 
 impl SmartTapResultData {
-    async fn decrypt_data(&self) {
+    pub fn is_encrypted(&self) -> bool {
+        self.record_bundle.is_encrypted()
+    }
+
+    pub fn is_compressed(&self) -> bool {
+        self.record_bundle.is_compressed()
+    }
+
+    pub fn raw_data(&self) -> &[u8] {
+        &self.record_bundle.data
+    }
+
+    pub async fn decrypt_data(&self) -> Option<alloc::vec::Vec<u8>> {
         let shared_secret = self.crypto_session.shared_secret(&self.handset_ephemeral_public_key);
         let keying_material = Self::hkdf_sha256(&shared_secret, &self.handset_ephemeral_public_key.public_compressed_point(), &self.crypto_session.kdf_info(), 48).await;
         let aes_key: [u8; 16] = (&keying_material[0..16]).try_into().unwrap();
         let hmac_key = &keying_material[16..48];
 
-        let mut iv = [0u8; 16];
-        for (i, v) in self.record_bundle.data.iter().take(12).enumerate() {
-            iv[i] = *v;
-        }
-        let ciphertext = &self.record_bundle.data[12..self.record_bundle.data.len()-32];
+        let iv: [u8; 12] = (&self.record_bundle.data[0..12]).try_into().unwrap();
+        let mut ciphertext = (&self.record_bundle.data[12..self.record_bundle.data.len()-32]).to_vec();
         let hmac_to_verify: [u8; 32] = (&self.record_bundle.data[self.record_bundle.data.len()-32..self.record_bundle.data.len()]).try_into().unwrap();
 
         if Self::hmac_sha256(hmac_key, &self.record_bundle.data[..self.record_bundle.data.len()-32]).await != hmac_to_verify {
             warn!("HMAC verification failed");
+            return None;
         }
+
+        Self::aes_128_ctr(&mut ciphertext, aes_key, iv).await;
+        Some(ciphertext)
     }
 
     async fn hkdf_sha256(ikm: &[u8], salt: &[u8], shared_info: &[u8], output_len: usize) -> alloc::vec::Vec<u8> {
@@ -241,9 +254,17 @@ impl SmartTapResultData {
     async fn hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
         let mut ipad = [0x36u8; 64];
         let mut opad = [0x5Cu8; 64];
-        for (i, v) in key.iter().enumerate() {
-            ipad[i] = ipad[i] ^ *v;
-            opad[i] = opad[i] ^ *v;
+        if key.len() > 64 {
+            let key = Self::sha256(key).await;
+            for (i, v) in key.iter().enumerate() {
+                ipad[i] = ipad[i] ^ *v;
+                opad[i] = opad[i] ^ *v;
+            }
+        } else {
+            for (i, v) in key.iter().enumerate() {
+                ipad[i] = ipad[i] ^ *v;
+                opad[i] = opad[i] ^ *v;
+            }
         }
         let mut h1_data = alloc::vec::Vec::with_capacity(64 + data.len());
         h1_data.extend(ipad);
@@ -268,8 +289,8 @@ impl SmartTapResultData {
 
     async fn aes_128_ctr(data: &mut [u8], key: [u8; 16], iv: [u8; 12]) {
         let mut aes_device = crate::AES.lock().await;
-        let ctr: u32 = 1;
-        for chunk in data.chunks_mut(16) {
+        for (ctr, chunk) in data.chunks_mut(16).enumerate() {
+            let ctr = ctr as u32;
             let mut ctr_block = [0u8; 16];
             for (i, v) in iv.iter().enumerate() {
                 ctr_block[i] = *v;

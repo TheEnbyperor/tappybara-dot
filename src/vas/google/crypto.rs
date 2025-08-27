@@ -45,7 +45,7 @@ impl Session {
         let mut tbs_digest = [0u8; 32];
         hasher.finish(&mut tbs_digest).unwrap();
         drop(hash_device);
-        let nsc_signature = self.config.private_key.sign(&tbs_digest);
+        let nsc_signature = crate::ecc::signature_to_der(&self.config.private_key.sign(&tbs_digest));
         let mut kdf_info = alloc::vec::Vec::new();
         kdf_info.extend_from_slice(&tbs_data);
         kdf_info.extend_from_slice(&nsc_signature);
@@ -56,7 +56,7 @@ impl Session {
             reader_ephemeral_public_key: self.reader_ephemeral_key.public_key(),
             key_version: self.config.key_version,
             collector_id: self.config.collector_id,
-            reader_signature: crate::ecc::signature_to_der(&nsc_signature)
+            reader_signature: nsc_signature,
         }
     }
 
