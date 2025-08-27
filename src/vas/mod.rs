@@ -33,6 +33,12 @@ pub enum Implementation {
     Google(google::FCI),
 }
 
+#[derive(Debug)]
+pub enum ResultData {
+    Apple(()),
+    Google(google::SmartTapResultData),
+}
+
 impl<'a, T: Target> VasClient<'a, T> {
     pub fn new(target: &'a mut T) -> Self {
         Self {

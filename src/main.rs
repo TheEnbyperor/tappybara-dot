@@ -47,6 +47,11 @@ pub static SHA: embassy_sync::mutex::Mutex<
     MaybeUninit<esp_hal::sha::Sha>,
 > = embassy_sync::mutex::Mutex::new(MaybeUninit::uninit());
 
+pub static AES: embassy_sync::mutex::Mutex<
+    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+    MaybeUninit<esp_hal::aes::Aes>,
+> = embassy_sync::mutex::Mutex::new(MaybeUninit::uninit());
+
 pub static UART_TX: embassy_sync::mutex::Mutex<
     embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
     MaybeUninit<esp_hal::uart::UartTx<esp_hal::Blocking>>,
@@ -175,15 +180,17 @@ fn parse_config_response(resp: coap_lite::CoapResponse) -> Option<asn::tappybara
 }
 
 struct VASConfig {
-    apple_config: Option<()>, // TODO: implement Apple config
-    google_config: Option<vas::google::TerminalConfig>
+    apple_config: Option<alloc::sync::Arc<()>>, // TODO: implement Apple config
+    google_config: Option<alloc::sync::Arc<vas::google::TerminalConfig>>
 }
 
 fn map_reader_config(config: asn::tappybara::ReaderConfig) -> VASConfig {
     VASConfig {
-        apple_config: config.apple_vasconfig.map(|_| ()),
+        apple_config: config.apple_vasconfig.map(|_| {
+            alloc::sync::Arc::new(())
+        }),
         google_config: config.google_smart_tap_config.map(|c| {
-            vas::google::TerminalConfig {
+            alloc::sync::Arc::new(vas::google::TerminalConfig {
                 collector_id: c.collector_id,
                 key_version: c.collector_key_version,
                 private_key: ecc::PrivateKey::from_bytes(c.collector_private_key.as_ref().try_into().unwrap()),
@@ -191,7 +198,7 @@ fn map_reader_config(config: asn::tappybara::ReaderConfig) -> VASConfig {
                 store_location_id: c.store_location_id.and_then(|i| i.try_into().ok()),
                 merchant_name: c.merchant_name,
                 merchant_category_code: c.mcc,
-            }
+            })
         })
     }
 }
@@ -219,114 +226,126 @@ async fn vas() {
     .await
     .unwrap();
 
-    let coap_client = coap_receiver.get().await;
+    'outer: loop {
+        let coap_client = coap_receiver.get().await;
+        let mut config_request = coap_lite::CoapRequest::new();
+        config_request.set_method(coap_lite::RequestType::Get);
+        config_request.set_path("/config");
+        config_request.message.add_option_as(coap_lite::CoapOption::Accept, coap_lite::option_value::OptionValueU16(65000));
 
-    let mut config_request = coap_lite::CoapRequest::new();
-    config_request.set_method(coap_lite::RequestType::Get);
-    config_request.set_path("/config");
-    config_request.message.add_option_as(coap_lite::CoapOption::Accept, coap_lite::option_value::OptionValueU16(65000));
-
-    let (config_resp, mut config_observe) = match coap_client.send_observe_request(config_request).await {
-        Ok(resp) => resp,
-        Err(e) => {
-            error!("Error getting VAS config: {:?}", e);
+        let (config_resp, mut config_observe) = match coap_client.send_observe_request(config_request).await {
+            Ok(resp) => resp,
+            Err(e) => {
+                error!("Error getting VAS config: {:?}", e);
+                status_sender.send(VASStatus::Error);
+                continue 'outer;
+            }
+        };
+        let Some(config) = parse_config_response(config_resp) else {
             status_sender.send(VASStatus::Error);
-            return;
-        }
-    };
-    let Some(config) = parse_config_response(config_resp) else {
-        status_sender.send(VASStatus::Error);
-        return;
-    };
-    info!("Reader config: {:?}", config);
+            continue 'outer;
+        };
+        info!("Reader config: {:?}", config);
 
-    let mut reader_config = map_reader_config(config);
+        let mut reader_config = map_reader_config(config);
 
-    let ecp = &[0x6A, 0x01, 0x00, 0x00, 0x02];
-    'main: loop {
-        let google_reader_ephemeral_key = ecc::PrivateKey::new();
-        status_sender.send(VASStatus::Polling);
-        let target = if let Some(observer) = config_observe.as_mut() {
-            loop {
-                if observer.has_next() {
-                    let resp = observer.next().await;
-                    match resp {
-                        Some(resp) => match parse_config_response(resp) {
-                            Some(new_config) => {
-                                info!("New reader config: {:?}", new_config);
-                                reader_config = map_reader_config(new_config);
+        let ecp = &[0x6A, 0x01, 0x00, 0x00, 0x02];
+        'main: loop {
+            let google_reader_ephemeral_key = ecc::PrivateKey::new();
+            status_sender.send(VASStatus::Polling);
+            let target = if let Some(observer) = config_observe.as_mut() {
+                loop {
+                    if observer.has_next() {
+                        let resp = observer.next().await;
+                        match resp {
+                            Ok(Some(resp)) => match parse_config_response(resp) {
+                                Some(new_config) => {
+                                    info!("New reader config: {:?}", new_config);
+                                    reader_config = map_reader_config(new_config);
+                                },
+                                None => {
+                                    status_sender.send(VASStatus::Error);
+                                    return;
+                                }
                             },
-                            None => {
-                                status_sender.send(VASStatus::Error);
-                                return;
+                            Ok(None) => {
+                                config_observe = None;
                             }
-                        },
-                        None => {
-                            config_observe = None;
+                            Err(e) => {
+                                error!("Error getting VAS config: {:?}", e);
+                                status_sender.send(VASStatus::Error);
+                                continue 'outer;
+                            }
+                        }
+                        continue 'main;
+                    }
+                    if let Some(target) = pn532::poll_target(&[pn532::types::Pn532PollType::Iso14443TypeA], Some(ecp)).await.transpose() {
+                        break target;
+                    }
+                    embassy_time::Timer::after_millis(250).await;
+                }
+            } else {
+                pn532::poll_target_loop(&[pn532::types::Pn532PollType::Iso14443TypeA], Some(ecp)).await
+            };
+            match async {
+                let target = target?;
+                info!("Got target: {:02X?}", target);
+                status_sender.send(VASStatus::Communicating);
+
+                let mut target = match &target.target {
+                    pn532::types::Pn532TargetType::Iso14443TypeA(_) => {
+                        iso_dep::IsoDep::new_type_a().await?
+                    }
+                    _ => unreachable!(),
+                };
+
+                let res: Result<Option<vas::ResultData>, vas::VasError> = (async || {
+                    let mut client = vas::VasClient::new(&mut target);
+                    let imp = client.get_client().await?;
+                    debug!("Implementation: {:02X?}", imp);
+                    match imp {
+                        vas::Implementation::Apple(_) => {
+                            let Some(_apple_config) = reader_config.apple_config.as_ref() else {
+                                return Err(vas::VasError::UnsupportedImplementation("No Apple config".to_string()));
+                            };
+                            Ok(Some(vas::ResultData::Apple(())))
+                        }
+                        vas::Implementation::Google(fci) => {
+                            let Some(google_config) = reader_config.google_config.as_ref() else {
+                                return Err(vas::VasError::UnsupportedImplementation("No Google config".to_string()));
+                            };
+                            let mut google_client = vas::google::Client::new(&mut target, fci, google_config.clone()).await;
+                            let res = google_client.do_exchange(google_reader_ephemeral_key).await?;
+                            debug!("Google result: {:02X?}", res);
+                            match res {
+                                vas::google::SmartTapResult::Success(d) => Ok(Some(vas::ResultData::Google(d))),
+                                _ => Ok(None),
+                            }
                         }
                     }
-                    continue 'main;
-                }
-                if let Some(target) = pn532::poll_target(&[pn532::types::Pn532PollType::Iso14443TypeA], Some(ecp)).await.transpose() {
-                    break target;
-                }
-                embassy_time::Timer::after_millis(250).await;
+                })()
+                    .await;
+
+                target.deselect().await?;
+
+                res
             }
-        } else {
-            pn532::poll_target_loop(&[pn532::types::Pn532PollType::Iso14443TypeA], Some(ecp)).await
-        };
-        match async {
-            let target = target?;
-            info!("Got target: {:02X?}", target);
-            status_sender.send(VASStatus::Communicating);
+                .await
+            {
+                Ok(res) => {
+                    if let Some(res) = res {
 
-            let mut target = match &target.target {
-                pn532::types::Pn532TargetType::Iso14443TypeA(_) => {
-                    iso_dep::IsoDep::new_type_a().await?
-                }
-                _ => unreachable!(),
-            };
-
-            let res: Result<(), vas::VasError> = (async || {
-                let mut client = vas::VasClient::new(&mut target);
-                let imp = client.get_client().await?;
-                debug!("Implementation: {:02X?}", imp);
-                match imp {
-                    vas::Implementation::Apple(_) => {}
-                    vas::Implementation::Google(fci) => {
-                        let Some(google_config) = reader_config.google_config.as_ref() else {
-                            return Err(vas::VasError::UnsupportedImplementation("No Google config".to_string()));
-                        };
-                        let mut google_client =
-                            vas::google::Client::new(&mut target, fci, &google_config).await;
-                        debug!(
-                            "Google result: {:02X?}",
-                            google_client
-                                .do_exchange(google_reader_ephemeral_key)
-                                .await?
-                        );
                     }
+
+                    status_sender.send(VASStatus::Done);
                 }
-                Ok(())
-            })()
-            .await;
-
-            target.deselect().await?;
-
-            res?;
-            Ok::<(), vas::VasError>(())
-        }
-        .await
-        {
-            Ok(()) => {
-                status_sender.send(VASStatus::Done);
+                Err(e) => {
+                    warn!("{:?}", e);
+                    status_sender.send(VASStatus::Error);
+                }
             }
-            Err(e) => {
-                warn!("{:?}", e);
-                status_sender.send(VASStatus::Error);
-            }
+            embassy_time::Timer::after_secs(3).await;
         }
-        embassy_time::Timer::after_secs(3).await;
     }
 }
 
