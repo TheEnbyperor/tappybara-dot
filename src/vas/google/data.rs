@@ -250,6 +250,32 @@ impl ServiceList {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct RecordBundle<'a> {
+    pub status: u8,
+    pub data: alloc::borrow::Cow<'a, [u8]>,
+}
+
+impl RecordBundle<'_> {
+    fn from_record(record: &ndef_rs::NdefRecord) -> Result<Self, VasError> {
+        if record.tnf() != ndef_rs::TNF::External {
+            return Err(VasError::CommunicationError("Invalid record bundle"));
+        }
+        if record.record_type() != b"reb" {
+            return Err(VasError::CommunicationError("Invalid record bundle"));
+        }
+        let p = record.payload();
+        if p.len() < 2 {
+            return Err(VasError::CommunicationError("Invalid record bundle"));
+        }
+        Ok(Self {
+            status: p[0],
+            data: alloc::borrow::Cow::Owned((&p[1..]).to_vec()),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct NegotiateSecureChannelRequest<'a> {
     pub version: u16,
     pub session: alloc::borrow::Cow<'a, Session>,
@@ -357,5 +383,64 @@ impl ServiceRequest<'_> {
             .payload(&ndef_rs::payload::ExternalPayload::from_raw(b"srq", data))
             .build()
             .unwrap()
+    }
+}
+
+#[derive(Debug)]
+pub struct ServiceResponse<'a> {
+    pub session: alloc::borrow::Cow<'a, Session>,
+    pub record_bundle: RecordBundle<'a>
+}
+
+impl ServiceResponse<'_> {
+    pub fn decode(data: &[u8]) -> Result<Self, VasError> {
+        let m = ndef_rs::NdefMessage::decode(data)
+            .map_err(|_| VasError::CommunicationError("Invalid NDEF message"))?;
+        if m.records().len() != 1 {
+            return Err(VasError::CommunicationError(
+                "Invalid service response",
+            ));
+        }
+        let r = &m.records()[0];
+        if r.tnf() != ndef_rs::TNF::External {
+            return Err(VasError::CommunicationError(
+                "Invalid service response",
+            ));
+        }
+        if r.record_type() != b"srs" {
+            return Err(VasError::CommunicationError(
+                "Invalid service response",
+            ));
+        }
+        let m = ndef_rs::NdefMessage::decode(r.payload())
+            .map_err(|_| VasError::CommunicationError("Invalid NDEF message"))?;
+        if m.records().len() != 2 {
+            return Err(VasError::CommunicationError(
+                "Invalid service response response",
+            ));
+        }
+        let session = Session::from_record(&m.records()[0])?;
+        let record_bundle = RecordBundle::from_record(&m.records()[0])?;
+        let dpk = &m.records()[1];
+        if dpk.tnf() != ndef_rs::TNF::External {
+            return Err(VasError::CommunicationError(
+                "Invalid record bundle",
+            ));
+        }
+        if dpk.record_type() != b"reb" {
+            return Err(VasError::CommunicationError(
+                "Invalid device ephemeral public key",
+            ));
+        }
+        if dpk.payload().len() != 33 {
+            return Err(VasError::CommunicationError(
+                "Invalid device ephemeral public key",
+            ));
+        }
+        let dpk = crate::ecc::PublicKey::from_compressed_point(dpk.payload().try_into().unwrap());
+        Ok(Self {
+            session: alloc::borrow::Cow::Owned(session),
+            record_bundle,
+        })
     }
 }

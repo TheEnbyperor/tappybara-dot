@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::fmt::Debug;
 use rand_chacha::rand_core::RngCore;
 
 mod sys {
@@ -10,10 +11,19 @@ mod sys {
     include!(concat!(env!("OUT_DIR"), "/micro_ecc_bindings.rs"));
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct PrivateKey {
     public_key: [u8; 64],
     private_key: [u8; 32],
+}
+
+impl Debug for PrivateKey {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("PrivateKey")
+            .field("private_key", &"REDACTED")
+            .field("public_key", &self.public_key)
+            .finish()
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -77,6 +87,14 @@ impl PrivateKey {
             sys::uECC_sign(self.private_key.as_ptr(), message_digest.as_ptr(), message_digest.len() as u32, signature.as_mut_ptr(), sys::uECC_secp256r1());
         }
         signature
+    }
+
+    pub fn shared_secret(&self, peer_key: &PublicKey) -> [u8; 32] {
+        let mut shared_secret = [0u8; 32];
+        unsafe {
+            sys::uECC_shared_secret(self.private_key.as_ptr(), peer_key.public_key.as_ptr(), shared_secret.as_mut_ptr(), sys::uECC_secp256r1());
+        }
+        shared_secret
     }
 }
 

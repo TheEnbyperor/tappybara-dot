@@ -4,11 +4,11 @@ mod session;
 mod crypto;
 
 pub use fci::FCI;
-pub use data::{ServiceValue};
 use crate::vas::VasError;
 
 static VERSION: u16 = 1;
 
+#[derive(Debug)]
 pub struct TerminalConfig {
     pub collector_id: u32,
     pub key_version: u32,
@@ -25,23 +25,25 @@ pub enum SmartTapResult {
     UnlockRequired,
     NoPassesAvailable,
     WaitingForSelection,
-    Success {
-        ready_for_payment: bool,
-        has_pases: bool,
-        pre_signed_auth: bool,
-        values: alloc::vec::Vec<ServiceValue>
-    }
+    Success(SmartTapResultData),
+}
+
+#[derive(Debug)]
+pub struct SmartTapResultData {
+    crypto_session: crypto::Session,
+    handset_ephemeral_public_key: crate::ecc::PublicKey,
+    record_bundle: data::RecordBundle<'static>,
 }
 
 pub struct Client<'a, T: super::Target> {
     target: &'a mut T,
     fci: FCI,
     session: session::Session,
-    config: &'a TerminalConfig,
+    config: alloc::sync::Arc<TerminalConfig>,
 }
 
 impl<'a, T: super::Target> Client<'a, T> {
-    pub async fn new(target: &'a mut T, fci: FCI, config: &'a TerminalConfig) -> Self {
+    pub async fn new(target: &'a mut T, fci: FCI, config: alloc::sync::Arc<TerminalConfig>) -> Self {
         Self {
             target,
             fci,
@@ -90,7 +92,7 @@ impl<'a, T: super::Target> Client<'a, T> {
         }
         let device_nonce: [u8; 32] = device_nonce.try_into().unwrap();
 
-        let mut crypto_session = crypto::Session::new(device_nonce, reader_ephemeral_key, &self.config).await;
+        let mut crypto_session = crypto::Session::new(device_nonce, reader_ephemeral_key, self.config.clone()).await;
 
         let ngr = ndef_rs::NdefMessage::from(&[
             data::NegotiateSecureChannelRequest {
@@ -145,8 +147,9 @@ impl<'a, T: super::Target> Client<'a, T> {
                 })
             }.to_record()
         ]).to_buffer().unwrap();
-        let (res, more_data) = loop {
-            let res = self.target.transmit(super::apdu::RequestAPDU {
+        let res = loop {
+            let mut data = vec![];
+            let mut res = self.target.transmit(super::apdu::RequestAPDU {
                 instruction_class: 0x90,
                 instruction: 0x50,
                 p1: 0x00,
@@ -154,11 +157,22 @@ impl<'a, T: super::Target> Client<'a, T> {
                 data: alloc::borrow::Cow::Borrowed(&srq),
                 expected_response_length: 256
             }).await?;
+            data.extend(res.data);
+            while res.sw1 == 0x91 && res.sw2 == 0x00 {
+                res = self.target.transmit(super::apdu::RequestAPDU {
+                    instruction_class: 0x90,
+                    instruction: 0xC0,
+                    p1: 0x00,
+                    p2: 0x00,
+                    data: alloc::borrow::Cow::Borrowed(&[]),
+                    expected_response_length: 256
+                }).await?;
+                data.extend(res.data);
+            }
 
             match (res.sw1, res.sw2) {
-                (0x90, _) => break (res.data, false),
-                (0x91, 0x00) => break (res.data, true),
-                (0x91, _) => break (res.data, false),
+                (0x90, _) => break data,
+                (0x91, _) => break data,
                 (0x92, _) => {
                     warn!("Target reported a transient failure, retrying");
                     continue;
@@ -173,8 +187,100 @@ impl<'a, T: super::Target> Client<'a, T> {
             }
         };
 
-        debug!("Received data response: {:?}", res);
+        let srs_resp = data::ServiceResponse::decode(&res)?;
+        debug!("Received service response: {:?}", srs_resp);
+        self.session.validate_response(&srs_resp.session)?;
 
-        Ok(SmartTapResult::NoPassesAvailable)
+        Ok(SmartTapResult::Success(SmartTapResultData {
+            crypto_session,
+            handset_ephemeral_public_key: ngr_resp.handset_ephemeral_public_key,
+            record_bundle: srs_resp.record_bundle,
+        }))
+    }
+}
+
+impl SmartTapResultData {
+    async fn decrypt_data(&self) {
+        let shared_secret = self.crypto_session.shared_secret(&self.handset_ephemeral_public_key);
+        let keying_material = Self::hkdf_sha256(&shared_secret, &self.handset_ephemeral_public_key.public_compressed_point(), &self.crypto_session.kdf_info(), 48).await;
+        let aes_key: [u8; 16] = (&keying_material[0..16]).try_into().unwrap();
+        let hmac_key = &keying_material[16..48];
+
+        let mut iv = [0u8; 16];
+        for (i, v) in self.record_bundle.data.iter().take(12).enumerate() {
+            iv[i] = *v;
+        }
+        let ciphertext = &self.record_bundle.data[12..self.record_bundle.data.len()-32];
+        let hmac_to_verify: [u8; 32] = (&self.record_bundle.data[self.record_bundle.data.len()-32..self.record_bundle.data.len()]).try_into().unwrap();
+
+        if Self::hmac_sha256(hmac_key, &self.record_bundle.data[..self.record_bundle.data.len()-32]).await != hmac_to_verify {
+            warn!("HMAC verification failed");
+        }
+    }
+
+    async fn hkdf_sha256(ikm: &[u8], salt: &[u8], shared_info: &[u8], output_len: usize) -> alloc::vec::Vec<u8> {
+        let prk = Self::hmac_sha256(salt, ikm).await;
+        let n = (output_len + 31) / 32;
+        let mut t = alloc::vec::Vec::with_capacity(n * 32);
+        let mut t_n = None;
+        for i in 0..n {
+            let mut input = alloc::vec::Vec::with_capacity(32 + shared_info.len() + 1);
+            if let Some(t_n) = &t_n {
+                input.extend(t_n);
+            }
+            input.extend(shared_info);
+            input.push((i + 1) as u8);
+            let nt_n = Self::hmac_sha256(&prk, &input).await;
+            t.extend(nt_n);
+            t_n = Some(nt_n);
+        }
+        t.truncate(output_len);
+        t
+    }
+
+    async fn hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
+        let mut ipad = [0x36u8; 64];
+        let mut opad = [0x5Cu8; 64];
+        for (i, v) in key.iter().enumerate() {
+            ipad[i] = ipad[i] ^ *v;
+            opad[i] = opad[i] ^ *v;
+        }
+        let mut h1_data = alloc::vec::Vec::with_capacity(64 + data.len());
+        h1_data.extend(ipad);
+        h1_data.extend(data);
+        let h1 = Self::sha256(&h1_data).await;
+        let mut h2_data = alloc::vec::Vec::with_capacity(64 + 32);
+        h2_data.extend(opad);
+        h2_data.extend(h1);
+        Self::sha256(&h2_data).await
+    }
+
+    async fn sha256(mut data: &[u8]) -> [u8; 32] {
+        let mut hash_device = crate::SHA.lock().await;
+        let mut hasher = unsafe { hash_device.assume_init_mut() }.start::<esp_hal::sha::Sha256>();
+        while !data.is_empty() {
+            data = hasher.update(&data).unwrap();
+        }
+        let mut digest = [0u8; 32];
+        hasher.finish(&mut digest).unwrap();
+        digest
+    }
+
+    async fn aes_128_ctr(data: &mut [u8], key: [u8; 16], iv: [u8; 12]) {
+        let mut aes_device = crate::AES.lock().await;
+        let ctr: u32 = 1;
+        for chunk in data.chunks_mut(16) {
+            let mut ctr_block = [0u8; 16];
+            for (i, v) in iv.iter().enumerate() {
+                ctr_block[i] = *v;
+            }
+            for (i, v) in ctr.to_be_bytes().iter().enumerate() {
+                ctr_block[12 + i] = *v;
+            }
+            unsafe { aes_device.assume_init_mut() }.process(&mut ctr_block, esp_hal::aes::Mode::Encryption128, key);
+            for (i, v) in chunk.iter_mut().enumerate() {
+                *v = ctr_block[i] ^ *v;
+            }
+        }
     }
 }

@@ -1,19 +1,20 @@
 use rand_chacha::rand_core::RngCore;
 use crate::vas::google::data;
 
-pub struct Session<'a > {
+#[derive(Debug)]
+pub struct Session {
     reader_nonce: [u8; 32],
     device_nonce: [u8; 32],
-    config: &'a super::TerminalConfig,
+    config: alloc::sync::Arc<super::TerminalConfig>,
     reader_ephemeral_key: crate::ecc::PrivateKey,
     kdf_info: Option<alloc::vec::Vec<u8>>,
 }
 
-impl<'a> Session<'a> {
+impl Session {
     pub async fn new(
         device_nonce: [u8; 32],
         reader_ephemeral_key: crate::ecc::PrivateKey,
-        config: &'a super::TerminalConfig
+        config: alloc::sync::Arc<super::TerminalConfig>
     ) -> Self {
         let mut r_n = [0u8; 32];
         let mut r = crate::RAND.lock().await;
@@ -57,5 +58,13 @@ impl<'a> Session<'a> {
             collector_id: self.config.collector_id,
             reader_signature: crate::ecc::signature_to_der(&nsc_signature)
         }
+    }
+
+    pub fn shared_secret(&self, peer_key: &crate::ecc::PublicKey) -> [u8; 32] {
+        self.reader_ephemeral_key.shared_secret(peer_key)
+    }
+
+    pub fn kdf_info(&self) -> &[u8] {
+        self.kdf_info.as_deref().unwrap_or(&[])
     }
 }

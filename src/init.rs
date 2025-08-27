@@ -130,6 +130,9 @@ async fn main(spawner: Spawner) -> ! {
     let sha = esp_hal::sha::Sha::new(peripherals.SHA);
     *crate::SHA.lock().await = MaybeUninit::new(sha);
 
+    let aes = esp_hal::aes::Aes::new(peripherals.AES);
+    *crate::AES.lock().await = MaybeUninit::new(aes);
+
     spawner.must_spawn(crate::net::wifi_connection(wifi_controller));
     spawner.must_spawn(crate::net(wifi_interfaces));
     spawner.must_spawn(crate::vas());
