@@ -246,8 +246,11 @@ pub async fn get_server(stack: embassy_net::Stack<'_>) -> embassy_net::IpEndpoin
         let target_srv = &srv_records[0];
         let address = match mdns_aaaa.get(target_srv.target()) {
             Some(addrs) => {
-                let addr_index = rand[1] as usize % addrs.len();
-                *addrs.iter().skip(addr_index).next().unwrap()
+                let viable_addresses = addrs.iter()
+                    .filter(|a| a.is_unicast_link_local())
+                    .collect::<alloc::vec::Vec<_>>();
+                let addr_index = rand[1] as usize % viable_addresses.len();
+                **viable_addresses.iter().skip(addr_index).next().unwrap()
             }
             None => continue,
         };
