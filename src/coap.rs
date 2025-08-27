@@ -508,13 +508,13 @@ impl CoAPObservation {
         !chan.is_empty()
     }
 
-    pub async fn next(&mut self) -> Option<coap_lite::CoapResponse> {
+    pub async fn next(&mut self) -> Result<Option<coap_lite::CoapResponse>, CoAPError> {
         if self.is_done {
-            return None;
+            return Ok(None);
         }
         loop {
             let Some(chan) = self.channel.upgrade() else {
-                return None;
+                return Err(CoAPError::ConnectionClosed);
             };
             let Ok(resp) = embassy_time::with_timeout(
                 embassy_time::Duration::from_millis(300),
@@ -528,18 +528,18 @@ impl CoAPObservation {
             if resp.get_status().is_error() {
                 self.packets.lock().await.remove(resp.message.get_token());
                 self.is_done = true;
-                return Some(resp);
+                return Ok(Some(resp));
             } else {
                 let Some(seq) = resp.message.get_first_option_as::<coap_lite::option_value::OptionValueU32>(coap_lite::CoapOption::Observe)
                     .transpose().ok().and_then(|o| o) else {
                     self.packets.lock().await.remove(resp.message.get_token());
                     self.is_done = true;
-                    return Some(resp);
+                    return Ok(Some(resp));
                 };
                 if (self.last_sequence < seq.0 && seq.0 - self.last_sequence < 2_i32.pow(23) as u32) ||
                     (self.last_sequence > seq.0 && self.last_sequence - seq.0 > 2_i32.pow(23) as u32) {
                     self.last_sequence = seq.0;
-                    return Some(resp);
+                    return Ok(Some(resp));
                 } else {
                     continue;
                 }
