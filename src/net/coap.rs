@@ -1,5 +1,6 @@
 use rand::{Rng, RngCore};
 
+#[derive(Clone, Copy, Debug)]
 struct CoAPTransmissionParameters {
     ack_timeout: embassy_time::Duration,
     ack_random_factor: f64,
@@ -45,7 +46,7 @@ impl CoAPTransmissionParameters {
 }
 
 pub struct CoAPConnection<'a> {
-    tls_connection: crate::tls::Connection<'a>,
+    tls_connection: super::tls::Connection<'a>,
     transmission_parameters: CoAPTransmissionParameters,
     in_flight: alloc::collections::BTreeMap<u16, InFlightPacket>,
     ping_in_flight: bool,
@@ -57,7 +58,6 @@ pub struct CoAPConnection<'a> {
 #[derive(Debug)]
 struct InFlightPacket {
     packet: coap_lite::Packet,
-    first_transmitted: embassy_time::Instant,
     timeout: embassy_time::Duration,
     timeout_at: embassy_time::Instant,
     retransmission_count: usize,
@@ -80,6 +80,7 @@ struct CoAPConnectionChannel {
 #[derive(Debug, Clone)]
 pub struct CoAPConnectionHandle {
     channel: alloc::sync::Weak<CoAPConnectionChannel>,
+    transmission_parameters: CoAPTransmissionParameters,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -89,7 +90,7 @@ pub enum CoAPConnectionError {
 }
 
 impl<'a> CoAPConnection<'a> {
-    pub fn new(tls_connection: crate::tls::Connection<'a>) -> Self {
+    pub fn new(tls_connection: super::tls::Connection<'a>) -> Self {
         Self {
             tls_connection,
             transmission_parameters: CoAPTransmissionParameters::default(),
@@ -107,6 +108,7 @@ impl<'a> CoAPConnection<'a> {
     pub fn handle(&self) -> CoAPConnectionHandle {
         CoAPConnectionHandle {
             channel: alloc::sync::Arc::downgrade(&self.channel),
+            transmission_parameters: self.transmission_parameters,
         }
     }
 
@@ -294,7 +296,6 @@ impl<'a> CoAPConnection<'a> {
         let packet = InFlightPacket {
             packet,
             timeout_at: now + timeout,
-            first_transmitted: now,
             timeout,
             retransmission_count: 0,
             is_ping,
@@ -318,7 +319,7 @@ impl<'a> CoAPConnection<'a> {
         &mut self,
         message_id: u16,
     ) -> Result<(), CoAPConnectionError> {
-        let mut packet = self.in_flight.get_mut(&message_id).unwrap();
+        let packet = self.in_flight.get_mut(&message_id).unwrap();
         let is_ping = packet.is_ping;
         if packet.retransmission_count < self.transmission_parameters.max_retransmit {
             packet.retransmission_count += 1;
@@ -370,20 +371,18 @@ type PacketChannel = embassy_sync::channel::Channel<
     coap_lite::Packet,
     1,
 >;
-type PacketRegistry = alloc::sync::Arc<
-    embassy_sync::mutex::Mutex<
-        embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
-        alloc::collections::BTreeMap<
-            alloc::vec::Vec<u8>,
-            alloc::sync::Arc<PacketChannel>,
-        >,
+type PacketRegistry = embassy_sync::mutex::Mutex<
+    embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+    alloc::collections::BTreeMap<
+        alloc::vec::Vec<u8>,
+        alloc::sync::Arc<PacketChannel>,
     >,
 >;
 
 #[derive(Clone)]
 pub struct CoAPClient {
     connection: CoAPConnectionHandle,
-    packets: PacketRegistry,
+    packets: alloc::sync::Arc<PacketRegistry>,
 }
 
 #[derive(Debug, Clone)]
@@ -437,7 +436,7 @@ impl CoAPClient {
     pub async fn send_request(&self, req: coap_lite::CoapRequest<()>) -> Result<coap_lite::CoapResponse, CoAPError> {
         let (chan, token)  = self.send_packet(req.message).await?;
         let res = embassy_time::with_timeout(
-            embassy_time::Duration::from_secs(10),
+            self.connection.transmission_parameters.max_transmit_wait(),
             chan.receive()
         ).await;
         self.packets.lock().await.remove(&token);
@@ -456,7 +455,7 @@ impl CoAPClient {
         req.message.add_option_as(coap_lite::CoapOption::Observe, coap_lite::option_value::OptionValueU8(0));
         let (chan, token)  = self.send_packet(req.message).await?;
         let res = embassy_time::with_timeout(
-            embassy_time::Duration::from_secs(10),
+            self.connection.transmission_parameters.max_transmit_wait(),
             chan.receive()
         ).await;
         match res{
@@ -469,7 +468,7 @@ impl CoAPClient {
                 let observe = match resp.message.get_first_option_as::<coap_lite::option_value::OptionValueU32>(coap_lite::CoapOption::Observe)
                     .transpose().ok().and_then(|o| o) {
                     Some(seq) => Some(CoAPObservation {
-                        packets: self.packets.clone(),
+                        packets: alloc::sync::Arc::downgrade(&self.packets),
                         channel: alloc::sync::Arc::downgrade(&chan),
                         last_sequence: seq.0,
                         is_done: false,
@@ -491,7 +490,7 @@ impl CoAPClient {
 }
 
 pub struct CoAPObservation {
-    packets: PacketRegistry,
+    packets: alloc::sync::Weak<PacketRegistry>,
     channel: alloc::sync::Weak<PacketChannel>,
     last_sequence: u32,
     is_done: bool,
@@ -500,10 +499,10 @@ pub struct CoAPObservation {
 impl CoAPObservation {
     pub fn has_next(&self) -> bool {
         if self.is_done {
-            return false;
+            return true;
         }
         let Some(chan) = self.channel.upgrade() else {
-            return false;
+            return true;
         };
         !chan.is_empty()
     }
@@ -514,6 +513,7 @@ impl CoAPObservation {
         }
         loop {
             let Some(chan) = self.channel.upgrade() else {
+                self.is_done = true;
                 return Err(CoAPError::ConnectionClosed);
             };
             let Ok(resp) = embassy_time::with_timeout(
@@ -526,13 +526,17 @@ impl CoAPObservation {
             };
             let resp = coap_lite::CoapResponse { message: resp };
             if resp.get_status().is_error() {
-                self.packets.lock().await.remove(resp.message.get_token());
+                if let Some(packets) = self.packets.upgrade() {
+                    packets.lock().await.remove(resp.message.get_token());
+                }
                 self.is_done = true;
                 return Ok(Some(resp));
             } else {
                 let Some(seq) = resp.message.get_first_option_as::<coap_lite::option_value::OptionValueU32>(coap_lite::CoapOption::Observe)
                     .transpose().ok().and_then(|o| o) else {
-                    self.packets.lock().await.remove(resp.message.get_token());
+                    if let Some(packets) = self.packets.upgrade() {
+                        packets.lock().await.remove(resp.message.get_token());
+                    }
                     self.is_done = true;
                     return Ok(Some(resp));
                 };
@@ -549,7 +553,7 @@ impl CoAPObservation {
 }
 
 #[embassy_executor::task]
-async fn run_coap_client(handle: CoAPConnectionHandle, packets: PacketRegistry) {
+async fn run_coap_client(handle: CoAPConnectionHandle, packets: alloc::sync::Arc<PacketRegistry>) {
     loop {
         let Some(connection) = handle.channel.upgrade() else {
             return;

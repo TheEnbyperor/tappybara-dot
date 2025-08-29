@@ -1,3 +1,8 @@
+pub mod mdns;
+pub mod tls;
+pub mod coap;
+
+
 #[embassy_executor::task]
 pub async fn wifi_connection(mut controller: esp_wifi::wifi::WifiController<'static>) {
     let status_sender = crate::WIFI_STATUS.sender();

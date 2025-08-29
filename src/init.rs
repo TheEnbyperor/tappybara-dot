@@ -63,7 +63,7 @@ async fn main(spawner: Spawner) -> ! {
                 interrupt::enable(Interrupt::FROM_CPU_INTR1, Priority::Priority2).unwrap();
                 let spawner = exec1.start(Priority::Priority2);
 
-                spawner.must_spawn(crate::lights());
+                spawner.must_spawn(crate::ui::lights());
                 spawner.must_spawn(crate::pn532::io());
 
                 loop { core::hint::spin_loop() }
@@ -83,7 +83,7 @@ async fn main(spawner: Spawner) -> ! {
     *crate::RAND.lock().await = MaybeUninit::new(rng);
 
     crate::ecc::init();
-    crate::tls::init();
+    crate::net::tls::init();
 
     let timg0 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0);
     let esp_radio_ctrl = ESP_RADIO_CTRL.init(esp_wifi::init(timg0.timer0, esp_rng.clone()).unwrap());
@@ -134,7 +134,7 @@ async fn main(spawner: Spawner) -> ! {
     *crate::AES.lock().await = MaybeUninit::new(aes);
 
     spawner.must_spawn(crate::net::wifi_connection(wifi_controller));
-    spawner.must_spawn(crate::net(wifi_interfaces));
+    spawner.must_spawn(crate::server_connection(wifi_interfaces));
     spawner.must_spawn(crate::vas());
     spawner.must_spawn(crate::improv::improv(uart_rx));
 

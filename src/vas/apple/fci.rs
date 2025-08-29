@@ -1,10 +1,5 @@
 use super::super::{VasError, get_tlv_primitive_value, find_tlv_tag};
-
-lazy_static::lazy_static! {
-    static ref VERSION: iso7816_tlv::ber::Tag = iso7816_tlv::ber::Tag::try_from(0x9F21).unwrap();
-    static ref CAPABILITIES: iso7816_tlv::ber::Tag = iso7816_tlv::ber::Tag::try_from(0x9F23).unwrap();
-    static ref NONCE: iso7816_tlv::ber::Tag = iso7816_tlv::ber::Tag::try_from(0x9F24).unwrap();
-}
+use super::commands;
 
 #[derive(Debug)]
 pub struct FCI {
@@ -15,13 +10,13 @@ pub struct FCI {
 
 impl FCI {
     pub fn parse(fci: iso7816_tlv::ber::Tlv) -> Result<Self, VasError> {
-        let version = find_tlv_tag(&fci, &VERSION)
+        let version = find_tlv_tag(&fci, &commands::DEVICE_VERSION)
             .map(get_tlv_primitive_value)
             .ok_or(VasError::CommunicationError("Missing version tag"))?;
-        let caps = find_tlv_tag(&fci, &CAPABILITIES)
+        let caps = find_tlv_tag(&fci, &commands::DEVICE_CAPABILITIES)
             .map(get_tlv_primitive_value)
             .ok_or(VasError::CommunicationError("Missing capabilities tag"))?;
-        let nonce = find_tlv_tag(&fci, &NONCE)
+        let nonce = find_tlv_tag(&fci, &commands::DEVICE_NONCE)
             .map(get_tlv_primitive_value)
             .ok_or(VasError::CommunicationError("Missing nonce tag"))?;
 

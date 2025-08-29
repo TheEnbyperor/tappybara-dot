@@ -35,7 +35,7 @@ pub enum Implementation {
 
 #[derive(Debug)]
 pub enum ResultData {
-    Apple(()),
+    Apple(apple::ResultData),
     Google(google::SmartTapResultData),
 }
 
@@ -62,7 +62,7 @@ impl<'a, T: Target> VasClient<'a, T> {
         let (fci, left) = iso7816_tlv::ber::Tlv::parse(&resp.data);
         let fci = fci.map_err(VasError::TlvError)?;
         if !fci.tag().eq(&FCI) {
-            return Err(VasError::CommunicationError("Wrong tag for FCI FCI"));
+            return Err(VasError::CommunicationError("Wrong tag for FCI"));
         }
         if !left.is_empty() {
             return Err(VasError::CommunicationError("Extra data after FCI"));

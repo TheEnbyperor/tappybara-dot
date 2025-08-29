@@ -2,6 +2,7 @@ use types::Pn532Command;
 
 pub mod types;
 mod io;
+pub mod iso_dep;
 
 pub use io::io;
 

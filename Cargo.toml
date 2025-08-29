@@ -34,6 +34,9 @@ rasn = { version = "0.27.1", default-features = false, features = ["bytes"] }
 coap-lite = { version = "0.13.3", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false }
 rand = { version = "0.9.2", default-features = false }
+libz-rs-sys = { version = "0.5.1", default-features = false, features = ["c-allocator"] }
+zlib-rs = { version = "0.5.1", default-features = false, features = ["c-allocator"] }
+ghash = "0.5.1"
 
 [patch.crates-io]
 esp-hal = { path = "target/patch/esp-hal-1.0.0-rc.0" }

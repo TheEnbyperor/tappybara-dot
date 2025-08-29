@@ -33,12 +33,6 @@ enum ErrorState {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-struct SendWifiSettingCommand {
-    ssid: alloc::string::String,
-    password: alloc::string::String,
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
 struct CommandResult {
     command: u8,
     data: alloc::vec::Vec<alloc::string::String>,

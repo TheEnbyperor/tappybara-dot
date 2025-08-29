@@ -51,6 +51,10 @@ Tappybara DEFINITIONS AUTOMATIC TAGS ::= BEGIN
 	}
 
 	AppleVASData ::= SEQUENCE {
+		passes SEQUENCE OF AppleVASPassData
+	}
+
+	AppleVASPassData ::= SEQUENCE {
 		passId IA5String,
 		data CHOICE {
 			encrypted AppleVASEncryptedData,

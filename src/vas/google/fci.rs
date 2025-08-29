@@ -40,12 +40,12 @@ pub struct ApplicationDirectoryEntry {
     pub capabilities: Option<ApplicationCapabilities>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum EncryptionType {
     P256,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum AuthenticationType {
     GenericKeyAuthentication
 }

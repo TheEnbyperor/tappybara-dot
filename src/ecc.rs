@@ -17,10 +17,18 @@ pub struct PrivateKey {
     private_key: [u8; 32],
 }
 
+struct Redacted;
+
+impl Debug for Redacted {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("REDACTED")
+    }
+}
+
 impl Debug for PrivateKey {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("PrivateKey")
-            .field("private_key", &"REDACTED")
+            .field("private_key", &Redacted)
             .field("public_key", &self.public_key)
             .finish()
     }
@@ -107,6 +115,10 @@ impl PublicKey {
         Self {
             public_key: uncompressed_point
         }
+    }
+
+    pub fn x(&self) -> [u8; 32] {
+        self.public_key[0..32].try_into().unwrap()
     }
 
     pub fn public_compressed_point(&self) -> [u8; 33] {
