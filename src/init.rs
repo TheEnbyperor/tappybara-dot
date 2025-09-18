@@ -49,7 +49,7 @@ async fn main(spawner: Spawner) -> ! {
 
     crate::util::init_heap();
     crate::util::setup_logger();
-    log::set_max_level(log::LevelFilter::Debug);
+    log::set_max_level(log::LevelFilter::Info);
 
     let timg1 = esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG1);
     esp_hal_embassy::init([timg1.timer0, timg1.timer1]);

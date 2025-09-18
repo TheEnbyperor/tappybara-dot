@@ -62,7 +62,6 @@ pub async fn improv(uart: &'static mut esp_hal::uart::UartRx<'static, esp_hal::A
             }
             break;
         }
-        info!("Got IMPROV header");
 
         let mut header: [u8; 3] = [0u8; 3];
         uart.read_exact_async(&mut header).await.unwrap();
@@ -177,6 +176,7 @@ async fn process_improv(state: &State<'_>, packet: ImprovPacket) {
                 0x02 => request_current_state().await,
                 0x03 => request_device_information().await,
                 0x04 => request_scanned_networks().await,
+                0x80 => set_server_identity(state, data).await,
                 _ => send_error(ErrorState::UnknownCommand),
             };
         },
@@ -245,7 +245,7 @@ async fn send_wifi_settings(state: &State<'_>, data: &[u8]) {
         return;
     }
     let ssid_len = data[0] as usize;
-    if ssid_len >= data.len() - 2 {
+    if ssid_len >= data.len() - 1 {
         send_error(ErrorState::InvalidPacket);
         return;
     }
@@ -274,12 +274,27 @@ async fn send_wifi_settings(state: &State<'_>, data: &[u8]) {
     current_state.networks = vec![crate::asn::tappybara_config::WifiNetwork {
         ssid: ssid.to_string(),
         password: if pwd.is_empty() { None } else { Some(pwd.to_string()) },
-        auth_method: crate::asn::tappybara_config::WifiAuthMethod::WPA2Personal,
+        auth_method: if pwd.is_empty() { crate::asn::tappybara_config::WifiAuthMethod::Open } else { crate::asn::tappybara_config::WifiAuthMethod::WPA2Personal },
     }];
     state.config_sender.send(current_state);
     crate::config::persist_connection_config().await;
     send_command_result(CommandResult {
         command: 0x01,
+        data: vec![],
+    })
+}
+
+async fn set_server_identity(state: &State<'_>, data: &[u8]) {
+    if data.len() != 32 {
+        send_error(ErrorState::InvalidPacket);
+        return;
+    }
+    let mut current_state = crate::CONNECTION_CONFIG.try_get().unwrap_or_else(crate::config::default_connection_config);
+    current_state.server_public_key_identity = data.to_vec().into();
+    state.config_sender.send(current_state);
+    crate::config::persist_connection_config().await;
+    send_command_result(CommandResult {
+        command: 0x80,
         data: vec![],
     })
 }

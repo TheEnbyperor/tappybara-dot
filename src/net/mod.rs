@@ -2,7 +2,6 @@ pub mod mdns;
 pub mod tls;
 pub mod coap;
 
-
 #[embassy_executor::task]
 pub async fn wifi_connection(mut controller: esp_wifi::wifi::WifiController<'static>) {
     let status_sender = crate::WIFI_STATUS.sender();
@@ -17,8 +16,11 @@ pub async fn wifi_connection(mut controller: esp_wifi::wifi::WifiController<'sta
     controller.set_configuration(&client_config).unwrap();
 
     loop {
-        info!("Starting wifi");
-        controller.start_async().await.unwrap();
+        if !controller.is_started().unwrap() {
+            info!("Starting wifi");
+            controller.start_async().await.unwrap();
+        }
+
         info!("Wifi scan");
         let scan_config = esp_wifi::wifi::ScanConfig::default();
         let result = controller
@@ -95,6 +97,7 @@ fn map_config(config: crate::asn::tappybara_config::ConnectionConfig) -> (esp_wi
                     crate::asn::tappybara_config::WifiAuthMethod::WPA2Personal => esp_wifi::wifi::AuthMethod::WPA2Personal,
                     crate::asn::tappybara_config::WifiAuthMethod::WPA3Personal => esp_wifi::wifi::AuthMethod::WPA3Personal,
                     crate::asn::tappybara_config::WifiAuthMethod::WPA2WPA3Personal => esp_wifi::wifi::AuthMethod::WPA2WPA3Personal,
+                    crate::asn::tappybara_config::WifiAuthMethod::Open => esp_wifi::wifi::AuthMethod::None,
                 },
                 ..Default::default()
             }), true);

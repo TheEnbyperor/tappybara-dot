@@ -20,6 +20,7 @@ TappybaraConfig DEFINITIONS AUTOMATIC TAGS ::= BEGIN
         WPA2Personal,
         WPA3Personal,
         WPA2WPA3Personal,
+        Open
         ...
     }
 

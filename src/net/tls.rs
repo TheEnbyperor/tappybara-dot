@@ -37,12 +37,14 @@ impl Method {
     }
 }
 
-pub struct Context(*mut sys::WOLFSSL_CTX);
+pub struct Context {
+    ctx: *mut sys::WOLFSSL_CTX,
+}
 
 impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
-            sys::wolfSSL_CTX_free(self.0);
+            sys::wolfSSL_CTX_free(self.ctx);
         }
     }
 }
@@ -67,13 +69,15 @@ impl Context {
                 1,
             );
         }
-        Self(ctx)
+        Self {
+            ctx,
+        }
     }
 
     pub fn set_certificate(&mut self, data: &[u8]) -> Result<(), i32> {
         unsafe {
             let ret = sys::wolfSSL_CTX_use_certificate_buffer(
-                self.0,
+                self.ctx,
                 data.as_ptr(),
                 data.len() as i32,
                 sys::WOLFSSL_FILETYPE_ASN1 as i32,
@@ -89,7 +93,7 @@ impl Context {
     pub fn set_private_key(&mut self, data: &[u8]) -> Result<(), i32> {
         unsafe {
             let ret = sys::wolfSSL_CTX_use_PrivateKey_buffer(
-                self.0,
+                self.ctx,
                 data.as_ptr(),
                 data.len() as i32,
                 sys::WOLFSSL_FILETYPE_ASN1 as i32,
@@ -102,9 +106,10 @@ impl Context {
         }
     }
 
-    pub fn set_verify_none(&mut self) {
+    pub fn set_verify_all(&mut self, cb: fn(i32, X509StoreContext) -> bool) {
         unsafe {
-            sys::wolfSSL_CTX_set_verify(self.0, sys::WOLFSSL_VERIFY_NONE as i32, None);
+            sys::wolfSSL_CTX_SetCertCbCtx(self.ctx, cb as *mut core::ffi::c_void);
+            sys::wolfSSL_CTX_set_verify(self.ctx, sys::WOLFSSL_VERIFY_PEER as i32, Some(verify_cb));
         }
     }
 
@@ -113,7 +118,7 @@ impl Context {
         socket: embassy_net::udp::UdpSocket<'a>,
         peer: embassy_net::IpEndpoint,
     ) -> Connection<'a> {
-        let tls = unsafe { sys::wolfSSL_new(self.0) };
+        let tls = unsafe { sys::wolfSSL_new(self.ctx) };
         if tls == core::ptr::null_mut() {
             panic!("SSL creation failed");
         }
@@ -138,6 +143,23 @@ impl Context {
             sys::wolfSSL_dtls_cid_use(tls);
         }
         Connection { state }
+    }
+}
+
+pub struct X509StoreContext {
+    ctx: *mut sys::WOLFSSL_X509_STORE_CTX,
+}
+
+impl X509StoreContext {
+    pub fn certs(&self) -> alloc::vec::Vec<&[u8]> {
+        let store = unsafe { &*self.ctx };
+        let mut out = vec![];
+        for i in 0..store.totalCerts {
+            out.push(unsafe {
+                core::slice::from_raw_parts((*store.certs.add(i as usize)).buffer, (*store.certs.add(i as usize)).length as usize)
+            });
+        }
+        out
     }
 }
 
@@ -479,6 +501,21 @@ unsafe extern "C" fn wolfssl_realloc(
     let out_ptr = ptr.add(LAYOUT_SIZE);
     *(ptr as *mut alloc::alloc::Layout) = new_layout;
     out_ptr as *mut core::ffi::c_void
+}
+
+unsafe extern "C" fn verify_cb(
+    pre_verify: i32,
+    store: *mut sys::WOLFSSL_X509_STORE_CTX
+) -> i32 {;
+    let store = &mut*store;
+    let cb = core::mem::transmute::<*const (), fn(i32, X509StoreContext) -> bool>(store.userCtx as *const ());
+    if cb(pre_verify, X509StoreContext {
+        ctx: store
+    }) {
+        1
+    } else {
+        0
+    }
 }
 
 mod ffi {

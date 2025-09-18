@@ -655,7 +655,7 @@ async fn server_connection(interfaces: esp_wifi::wifi::Interfaces<'static>) {
     let lt_public_asn1 = lt_identity.public_key().public_asn1();
     ctx.set_certificate(&lt_public_asn1).unwrap();
     ctx.set_private_key(&lt_private_asn1).unwrap();
-    ctx.set_verify_none(); // TODO: verify server identity
+    ctx.set_verify_all(server_identity_verify);
 
     loop {
         status_sender.send(DTLSStatus::Startup);
@@ -685,6 +685,7 @@ async fn server_connection(interfaces: esp_wifi::wifi::Interfaces<'static>) {
             continue;
         }
         status_sender.send(DTLSStatus::DTLSConnected);
+        info!("Connected to server");
 
         let mut coap_connection = net::coap::CoAPConnection::new(conn);
         let coap_client = net::coap::CoAPClient::new(coap_connection.handle()).await;
@@ -695,3 +696,14 @@ async fn server_connection(interfaces: esp_wifi::wifi::Interfaces<'static>) {
     }
 }
 
+fn server_identity_verify(_: i32, ctx: net::tls::X509StoreContext) -> bool {
+    let Some(connection_config) = CONNECTION_CONFIG.try_get() else {
+        return false;
+    };
+    let certs = ctx.certs();
+    if certs.len() != 1 {
+        return false;
+    }
+    let server_identity = embassy_futures::block_on(crypto::sha256(certs[0]));
+    server_identity.as_ref() == connection_config.server_public_key_identity.as_ref()
+}
